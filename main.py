@@ -22,7 +22,7 @@ def build_train_data_loader(args, config):
         train_dataset,
         batch_size=const.BATCH_SIZE,
         shuffle=True,
-        num_workers=4,
+        num_workers=2,
         drop_last=True,
     )
 
@@ -38,7 +38,7 @@ def build_test_data_loader(args, config):
         test_dataset,
         batch_size=const.BATCH_SIZE,
         shuffle=False,
-        num_workers=4,
+        num_workers=2,
         drop_last=False,
     )
 
