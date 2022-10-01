@@ -139,6 +139,9 @@ def train(args):
                 },
                 os.path.join(checkpoint_dir, "%d.pt" % epoch),
             )
+            art = wandb.Artifact("my-fastflow-models", type="model")
+            art.add_file(os.path.join(checkpoint_dir, "%d.pt" % epoch))
+            wandb.log_artifact(art)
 
 
 def evaluate(args):
