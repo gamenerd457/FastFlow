@@ -43,8 +43,9 @@ def build_test_data_loader(args, config):
     )
 
 
-def build_model(config):
+def build_model(config,args):
     model = fastflow.FastFlow(
+        pretrained_backbone_path=args.path_to_backbone,
         backbone_name=config["backbone_name"],
         flow_steps=config["flow_step"],
         input_size=config["input_size"],
@@ -110,7 +111,7 @@ def train(args):
     os.makedirs(checkpoint_dir, exist_ok=True)
 
     config = yaml.safe_load(open(args.config, "r"))
-    model = build_model(config)
+    model = build_model(config,args)
     optimizer = build_optimizer(model)
 
     train_dataloader = build_train_data_loader(args, config)
@@ -160,6 +161,7 @@ def parse_args():
     parser.add_argument(
         "-ckpt", "--checkpoint", type=str, help="path to load checkpoint"
     )
+    parser.add_argument("--path_to_backbone",action="store_true")
     args = parser.parse_args()
     return args
 
