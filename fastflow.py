@@ -39,6 +39,7 @@ def nf_fast_flow(input_chw, conv3x3_only, hidden_ratio, flow_steps, clamp=2.0):
 class FastFlow(nn.Module):
     def __init__(
         self,
+        pretrained_backbone_path=None,
         backbone_name,
         flow_steps,
         input_size,
@@ -55,12 +56,18 @@ class FastFlow(nn.Module):
             channels = [768]
             scales = [16]
         else:
-            self.feature_extractor = timm.create_model(
+            self.feature_extractor=timm.create_model(
                 backbone_name,
-                pretrained=True,
+                pretrained=False,checkpoint_path=pretrained_backbone_path,
                 features_only=True,
                 out_indices=[1, 2, 3],
             )
+ #           self.feature_extractor = timm.create_model(
+ #               backbone_name,
+ #               pretrained=True,
+ #               features_only=True,
+ #               out_indices=[1, 2, 3],
+ #           )
             channels = self.feature_extractor.feature_info.channels()
             scales = self.feature_extractor.feature_info.reduction()
 
