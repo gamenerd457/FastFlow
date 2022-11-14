@@ -4,6 +4,7 @@ import timm
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from timm.models.helpers import load_state_dict
 
 import constants as const
 
@@ -35,7 +36,6 @@ def nf_fast_flow(input_chw, conv3x3_only, hidden_ratio, flow_steps, clamp=2.0):
         )
     return nodes
 
-
 class FastFlow(nn.Module):
     def __init__(
         self,
@@ -56,12 +56,10 @@ class FastFlow(nn.Module):
             channels = [768]
             scales = [16]
         else:
-            self.feature_extractor=timm.create_model(
-                backbone_name,
-                pretrained=False,checkpoint_path=pretrained_backbone_path,
-                features_only=True,
-                out_indices=[1, 2, 3],
-            )
+            self.feature_extractor=timm.create_model("resnet18",pretrained=False,features_only=True,out_indices=[1, 2, 3])
+            state_dict=load_state_dict(pretrained_backbone_path)
+            self.feature_extractor.load_state_dict(torch.load(pretrained_backbone_path),strict=False)
+            
  #           self.feature_extractor = timm.create_model(
  #               backbone_name,
  #               pretrained=True,
