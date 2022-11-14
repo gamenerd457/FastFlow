@@ -161,7 +161,7 @@ def parse_args():
     parser.add_argument(
         "-ckpt", "--checkpoint", type=str, help="path to load checkpoint"
     )
-    parser.add_argument("--path_to_backbone",action="store_true")
+    parser.add_argument("-path_to_backbone",action="store_true")
     args = parser.parse_args()
     return args
 
