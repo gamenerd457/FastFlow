@@ -135,7 +135,7 @@ def train(args):
 
 def evaluate(args):
     config = yaml.safe_load(open(args.config, "r"))
-    model = build_model(config)
+    model = build_model(config,args)
     checkpoint = torch.load(args.checkpoint)
     model.load_state_dict(checkpoint["model_state_dict"])
     test_dataloader = build_test_data_loader(args, config)
