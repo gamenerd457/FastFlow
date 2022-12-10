@@ -46,7 +46,7 @@ class MVTecDataset(torch.utils.data.Dataset):
                     )
                 )
                 target = self.target_transform(target)
-            return image, target
+            return image
 
     def __len__(self):
         return len(self.image_files)
