@@ -47,38 +47,37 @@ class FastFlow(nn.Module):
         pretrained_backbone_path=None
     ):
         super(FastFlow, self).__init__()
-        assert (
-            backbone_name in const.SUPPORTED_BACKBONES
-        ), "backbone_name must be one of {}".format(const.SUPPORTED_BACKBONES)
 
         if backbone_name in [const.BACKBONE_CAIT, const.BACKBONE_DEIT]:
             self.feature_extractor = timm.create_model(backbone_name, pretrained=True)
             channels = [768]
             scales = [16]
         else:
-            self.feature_extractor=timm.create_model("resnet18",pretrained=False,features_only=True,out_indices=[1, 2, 3])
-            state_dict=load_state_dict(pretrained_backbone_path)
-            self.feature_extractor.load_state_dict(torch.load(pretrained_backbone_path),strict=False)
-            
- #           self.feature_extractor = timm.create_model(
- #               backbone_name,
- #               pretrained=True,
- #               features_only=True,
- #               out_indices=[1, 2, 3],
- #           )
-            channels = self.feature_extractor.feature_info.channels()
-            scales = self.feature_extractor.feature_info.reduction()
 
-            # for transformers, use their pretrained norm w/o grad
-            # for resnets, self.norms are trainable LayerNorm
-            self.norms = nn.ModuleList()
-            for in_channels, scale in zip(channels, scales):
-                self.norms.append(
-                    nn.LayerNorm(
-                        [in_channels, int(input_size / scale), int(input_size / scale)],
-                        elementwise_affine=True,
-                    )
-                )
+#
+ #          self.feature_extractor=timm.create_model("resnet18",pretrained=False,features_only=True,out_indices=[1, 2, 3])
+ #           state_dict=load_state_dict(pretrained_backbone_path)
+ #           self.feature_extractor.load_state_dict(torch.load(pretrained_backbone_path),strict=False)
+            
+          self.feature_extractor = timm.create_model(
+              backbone_name,
+              pretrained=True,
+              features_only=True,
+              out_indices=[1, 2, 3],
+          )
+          channels = self.feature_extractor.feature_info.channels()
+          scales = self.feature_extractor.feature_info.reduction()
+
+          # for transformers, use their pretrained norm w/o grad
+          # for resnets, self.norms are trainable LayerNorm
+          self.norms = nn.ModuleList()
+          for in_channels, scale in zip(channels, scales):
+              self.norms.append(
+                  nn.LayerNorm(
+                      [in_channels, int(input_size / scale), int(input_size / scale)],
+                      elementwise_affine=True,
+                  )
+              )
 
         for param in self.feature_extractor.parameters():
             param.requires_grad = False
