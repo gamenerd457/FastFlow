@@ -24,7 +24,7 @@ data="/content/data"
 category="bottle"
 
 
-device = 'cpu'
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 def build_train_data_loader():
     train_dataset = dataset.MVTecDataset(
         root=data,
@@ -190,6 +190,10 @@ class AverageMeter(object):
         fmtstr = '{name} {val' + self.fmt + '} ({avg' + self.fmt + '})'
         return fmtstr.format(**self.__dict__)
 
+config_student = yaml.safe_load(open(config_s, "r"))
+config_teacher = yaml.safe_load(open(config_t, "r"))
+model_s = build_model(config_student)
+model_t= build_model(config_teacher)
 def train():
     os.makedirs(const.CHECKPOINT_DIR, exist_ok=True)
     checkpoint_dir = os.path.join(
@@ -199,17 +203,16 @@ def train():
 
     config_student = yaml.safe_load(open(config_s, "r"))
     config_teacher = yaml.safe_load(open(config_t, "r"))
-    model_s = build_model(config_student)
-    model_t= build_model(config_teacher)
+
     optimizer = build_optimizer(model_t)
 
     train_dataloader = build_train_data_loader()
     test_dataloader = build_test_data_loader()
     model_s.to(device)
     model_t.to(device)
-    criterion_1=LSH(64*64*64,2)
-    criterion_2=LSH(128*32*32,2)
-    criterion_3=LSH(256*16*16,2)
+    criterion_1=LSH(64*64*64,2).to(device)
+    criterion_2=LSH(128*32*32,2).to(device)
+    criterion_3=LSH(256*16*16,2).to(device)
     criterion_list = nn.ModuleList([])
     criterion_list.append(criterion_1)    # classification loss
     criterion_list.append(criterion_2)    # KL divergence loss, original knowledge distillation
@@ -234,10 +237,43 @@ def train():
       loss.backward()
       optimizer.step()
     return losses.avg
-    
+def val():
+  test_dataloader = build_test_data_loader()
+  criterion_1=LSH(64*64*64,2).to(device)
+  criterion_2=LSH(128*32*32,2).to(device)
+  criterion_3=LSH(256*16*16,2).to(device)
+  criterion_list = nn.ModuleList([])
+  criterion_list.append(criterion_1)    # classification loss
+  criterion_list.append(criterion_2)    # KL divergence loss, original knowledge distillation
+  criterion_list.append(criterion_3)
+  losses = AverageMeter('Loss', ':6.3f')
+  model_t.eval()
+  model_s.eval()
+  with torch.no_grad(): 
+    for i,images in enumerate(test_dataloader):
+      images=images.to(device)
+      feat_s=model_s(images)
+      feat_t=model_t(images)
+    l1=criterion_1(feat_s[0].reshape((32,64*64*64)),feat_t[0].reshape((32,64*64*64)))
+    l2=criterion_2(feat_s[1].reshape((32,128*32*32)),feat_t[1].reshape((32,128*32*32)))
+    l3=criterion_3(feat_s[2].reshape((32,256*16*16)),feat_t[2].reshape((32,256*16*16)))
+    loss=l1+l2+l3
+    losses.update(loss.item(), images.size(0))
+  return losses.avg
+
 
 if __name__ == "__main__":
   epochs=40
+  is_val=False
   for i in range(epochs):
     train_loss=train()
-    print("Epoch {} /  train loss : {} ".format(i,train_loss))
+    print("Epoch {} /  train loss : {}".format(i,train_loss))
+
+    if is_val==True:
+      val_loss=val()
+      if val_loss < 70:
+        torch.save(model2.state_dict(),"student_model_state_dict.pt")
+        torch.save(model2,"student_model_first.pt")
+        print("model saved...")
+        break
+      print("Epoch {} /  train loss : {} / val loss : {}".format(i,train_loss,val_loss))
