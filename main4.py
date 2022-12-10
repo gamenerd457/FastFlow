@@ -18,16 +18,18 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.backends.cudnn as cudnn
 
-config_student="/content/FastFlow/configs/resnet18.yaml"
-config_teacher="/content/FastFlow/configs/wide_resnet50_2.yaml"
+config_s="/content/FastFlow/configs/resnet18.yaml"
+config_t="/content/FastFlow/configs/wide_resnet50_2.yaml"
 data="/content/data"
 category="bottle"
 
-def build_train_data_loader(args, config):
+
+device = 'cpu'
+def build_train_data_loader():
     train_dataset = dataset.MVTecDataset(
         root=data,
         category=category,
-        input_size=config["input_size"],
+        input_size=(256,256),
         is_train=True,
     )
     return torch.utils.data.DataLoader(
@@ -39,11 +41,11 @@ def build_train_data_loader(args, config):
     )
 
 
-def build_test_data_loader(args, config):
+def build_test_data_loader():
     test_dataset = dataset.MVTecDataset(
         root=data,
         category=category,
-        input_size=config["input_size"],
+        input_size=(256,256),
         is_train=False,
     )
     return torch.utils.data.DataLoader(
@@ -56,7 +58,7 @@ def build_test_data_loader(args, config):
 
 
 def build_model(config):
-    model = fastflow2.FastFlow
+    model = fastflow2.FastFlow(
         backbone_name=config["backbone_name"],
         flow_steps=config["flow_step"],
         input_size=config["input_size"],
@@ -188,23 +190,23 @@ class AverageMeter(object):
         fmtstr = '{name} {val' + self.fmt + '} ({avg' + self.fmt + '})'
         return fmtstr.format(**self.__dict__)
 
-def train(args):
+def train():
     os.makedirs(const.CHECKPOINT_DIR, exist_ok=True)
     checkpoint_dir = os.path.join(
         const.CHECKPOINT_DIR, "exp%d" % len(os.listdir(const.CHECKPOINT_DIR))
     )
     os.makedirs(checkpoint_dir, exist_ok=True)
 
-    config_student = yaml.safe_load(open(config_student, "r"))
-    config_teacher = yaml.safe_load(open(config_teacher, "r"))
+    config_student = yaml.safe_load(open(config_s, "r"))
+    config_teacher = yaml.safe_load(open(config_t, "r"))
     model_s = build_model(config_student)
     model_t= build_model(config_teacher)
     optimizer = build_optimizer(model_t)
 
-    train_dataloader = build_train_data_loader(config_teacher)
-    test_dataloader = build_test_data_loader(config_teacher)
-    model_s.cuda()
-    model_t.cuda()
+    train_dataloader = build_train_data_loader()
+    test_dataloader = build_test_data_loader()
+    model_s.to(device)
+    model_t.to(device)
     criterion_1=LSH(64*64*64,2)
     criterion_2=LSH(128*32*32,2)
     criterion_3=LSH(256*16*16,2)
@@ -213,12 +215,16 @@ def train(args):
     criterion_list.append(criterion_2)    # KL divergence loss, original knowledge distillation
     criterion_list.append(criterion_3)
     losses = AverageMeter('Loss', ':6.3f')
-    model_teacher.eval()
-    model_student.train()
+    model_t.eval()
+    model_s.train()
     for i ,images in enumerate(train_dataloader):
-      feat_s=model_student(images)
+      images=images.to(device)
+      feat_s=model_s(images)
       with torch.no_grad():
-        feat_t=model_teacher(images)
+        feat_t=model_t(images)
+      #print(feat_s[0].shape)
+      #print(feat_t[0].shape)
+
       l1=criterion_1(feat_s[0].reshape((32,64*64*64)),feat_t[0].reshape((32,64*64*64)))
       l2=criterion_2(feat_s[1].reshape((32,128*32*32)),feat_t[1].reshape((32,128*32*32)))
       l3=criterion_3(feat_s[2].reshape((32,256*16*16)),feat_t[2].reshape((32,256*16*16)))
