@@ -39,12 +39,12 @@ def nf_fast_flow(input_chw, conv3x3_only, hidden_ratio, flow_steps, clamp=2.0):
 class FastFlow(nn.Module):
     def __init__(
         self,
-        pretrained_backbone_path,
         backbone_name,
         flow_steps,
         input_size,
         conv3x3_only=False,
         hidden_ratio=1.0,
+        pretrained_backbone_path=None
     ):
         super(FastFlow, self).__init__()
         assert (
