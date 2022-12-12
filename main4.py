@@ -276,9 +276,9 @@ if __name__ == "__main__":
 
     if is_val==True:
       val_loss=val()
-      if val_loss < 70:
-        torch.save(model2.state_dict(),"student_model_state_dict.pt")
-        torch.save(model2,"student_model_first.pt")
+      if val_loss <= 90:
+        torch.save(model2.state_dict(),"fastflow_kd_LSH_student_model_state_dict.pt")
+        torch.save(model2,"fastflow_kd_LSH_student_model_first.pt")
         print("model saved...")
         break
       print("Epoch {} /  train loss : {} / val loss : {}".format(i,train_loss,val_loss))
