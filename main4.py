@@ -246,6 +246,9 @@ def val():
   criterion_list.append(criterion_1)    # classification loss
   criterion_list.append(criterion_2)    # KL divergence loss, original knowledge distillation
   criterion_list.append(criterion_3)
+  criterion_1 = criterion_list[0]
+  criterion_2 = criterion_list[1]
+  criterion_3 = criterion_list[2]
   losses = AverageMeter('Loss', ':6.3f')
   model_t.eval()
   model_s.eval()
@@ -254,9 +257,11 @@ def val():
       images=images.to(device)
       feat_s=model_s(images)
       feat_t=model_t(images)
-    l1=criterion_1(feat_s[0].reshape((32,64*64*64)),feat_t[0].reshape((32,64*64*64)))
-    l2=criterion_2(feat_s[1].reshape((32,128*32*32)),feat_t[1].reshape((32,128*32*32)))
-    l3=criterion_3(feat_s[2].reshape((32,256*16*16)),feat_t[2].reshape((32,256*16*16)))
+    print(feat_s[0].shape)
+    print(feat_t[0].shape)
+    l1=criterion_1(feat_s[0].reshape((19,64*64*64)),feat_t[0].reshape((19,64*64*64)))
+    l2=criterion_2(feat_s[1].reshape((19,128*32*32)),feat_t[1].reshape((19,128*32*32)))
+    l3=criterion_3(feat_s[2].reshape((19,256*16*16)),feat_t[2].reshape((19,256*16*16)))
     loss=l1+l2+l3
     losses.update(loss.item(), images.size(0))
   return losses.avg
@@ -264,7 +269,7 @@ def val():
 
 if __name__ == "__main__":
   epochs=40
-  is_val=False
+  is_val=True
   for i in range(epochs):
     train_loss=train()
     print("Epoch {} /  train loss : {}".format(i,train_loss))
