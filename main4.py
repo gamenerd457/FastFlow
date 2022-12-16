@@ -167,6 +167,72 @@ class LSH(nn.Module):
             loss = self.LSH_loss(hash_s, hash_t)
         return l2_loss + loss
 
+class MMDloss(nn.Module):
+    def __init__(self, kernel_mul=2.0, kernel_num=5):
+        super(MMDloss, self).__init__()
+        self.kernel_num = kernel_num
+        self.kernel_mul = kernel_mul
+        self.fix_sigma = None
+    @staticmethod
+    def guassian_kernel(source, target, kernel_mul=2.0, kernel_num=5, fix_sigma=None):
+        n_samples = int(source.size()[0]) + int(target.size()[0])
+        total = torch.cat([source, target], dim=0)
+        total0 = total.unsqueeze(0).expand(
+            int(total.size(0)), int(total.size(0)), int(total.size(1))
+        )
+        total1 = total.unsqueeze(1).expand(
+            int(total.size(0)), int(total.size(0)), int(total.size(1))
+        )
+        L2_distance = ((total0 - total1) ** 2).sum(2)
+        if fix_sigma:
+            bandwidth = fix_sigma
+        else:
+            bandwidth = torch.sum(L2_distance.data) / (n_samples**2 - n_samples)
+        bandwidth /= kernel_mul ** (kernel_num // 2)
+        bandwidth_list = [bandwidth * (kernel_mul**i) for i in range(kernel_num)]
+        kernel_val = [
+            torch.exp(-L2_distance / bandwidth_temp)
+            for bandwidth_temp in bandwidth_list
+        ]
+        return sum(kernel_val)
+    def forward(self, source, target):
+        batch_size = int(source.size()[0])
+        kernels = self.guassian_kernel(
+            source,
+            target,
+            kernel_mul=self.kernel_mul,
+            kernel_num=self.kernel_num,
+            fix_sigma=self.fix_sigma,
+        )
+        XX = kernels[:batch_size, :batch_size]
+        YY = kernels[batch_size:, batch_size:]
+        XY = kernels[:batch_size, batch_size:]
+        YX = kernels[batch_size:, :batch_size]
+        loss = torch.mean(XX + YY - XY - YX)
+        return loss
+def covariance(x):
+    batch_size = x.shape[0]
+    mm1 = torch.mm(x.t(), x)
+    cols_summed = torch.sum(x, dim=0)
+    mm2 = torch.mm(cols_summed.unsqueeze(1), cols_summed.unsqueeze(0))
+    return (1.0 / (batch_size - 1)) * (mm1 - (1.0 / batch_size) * mm2)
+class CORALLoss(torch.nn.Module):
+    """
+    Implementation of [Deep CORAL:
+    Correlation Alignment for
+    Deep Domain Adaptation](https://arxiv.org/abs/1607.01719)
+    """
+    def forward(self, x: torch.Tensor, y: torch.Tensor):
+        """
+        Arguments:
+            x: features from one domain
+            y: features from the other domain
+        """
+        embedding_size = x.shape[1]
+        cx = covariance(x)
+        cy = covariance(y)
+        squared_fro_norm = torch.linalg.norm(cx - cy, ord="fro") ** 2
+        return squared_fro_norm / (4 * (embedding_size**2))
 class AverageMeter(object):
     """Computes and stores the average and current value"""
     def __init__(self, name, fmt=':f'):
@@ -194,7 +260,7 @@ config_student = yaml.safe_load(open(config_s, "r"))
 config_teacher = yaml.safe_load(open(config_t, "r"))
 model_s = build_model(config_student)
 model_t= build_model(config_teacher)
-def train():
+def train(criterion="LSH"):
     os.makedirs(const.CHECKPOINT_DIR, exist_ok=True)
     checkpoint_dir = os.path.join(
         const.CHECKPOINT_DIR, "exp%d" % len(os.listdir(const.CHECKPOINT_DIR))
@@ -210,9 +276,15 @@ def train():
     test_dataloader = build_test_data_loader()
     model_s.to(device)
     model_t.to(device)
-    criterion_1=LSH(64*64*64,2).to(device)
-    criterion_2=LSH(128*32*32,2).to(device)
-    criterion_3=LSH(256*16*16,2).to(device)
+    print("using {}...... \n".format(criterion))
+    if criterion=="LSH":
+      criterion_1=LSH(64*64*64,2).to(device)
+      criterion_2=LSH(128*32*32,2).to(device)
+      criterion_3=LSH(256*16*16,2).to(device)
+    elif criterion=="MMD":
+      criterion_1=MMDloss().to(device)
+      criterion_2=MMDloss().to(device)
+      criterion_3=MMDloss().to(device)
     criterion_list = nn.ModuleList([])
     criterion_list.append(criterion_1)    # classification loss
     criterion_list.append(criterion_2)    # KL divergence loss, original knowledge distillation
@@ -237,11 +309,16 @@ def train():
       loss.backward()
       optimizer.step()
     return losses.avg
-def val():
+def val(criterion="LSH"):
   test_dataloader = build_test_data_loader()
-  criterion_1=LSH(64*64*64,2).to(device)
-  criterion_2=LSH(128*32*32,2).to(device)
-  criterion_3=LSH(256*16*16,2).to(device)
+  if criterion=="LSH":
+    criterion_1=LSH(64*64*64,2).to(device)
+    criterion_2=LSH(128*32*32,2).to(device)
+    criterion_3=LSH(256*16*16,2).to(device)
+  elif criterion=="MMD":
+    criterion_1=MMDloss().to(device)
+    criterion_2=MMDloss().to(device)
+    criterion_3=MMDloss().to(device)
   criterion_list = nn.ModuleList([])
   criterion_list.append(criterion_1)    # classification loss
   criterion_list.append(criterion_2)    # KL divergence loss, original knowledge distillation
@@ -270,15 +347,16 @@ def val():
 if __name__ == "__main__":
   epochs=40
   is_val=True
+  criterion="LSH"
   for i in range(epochs):
-    train_loss=train()
+    train_loss=train(criterion)
     print("Epoch {} /  train loss : {}".format(i,train_loss))
 
     if is_val==True:
       val_loss=val()
       if val_loss <= 90:
-        torch.save(model2.state_dict(),"fastflow_kd_LSH_student_model_state_dict.pt")
-        torch.save(model2,"fastflow_kd_LSH_student_model_first.pt")
+        torch.save(model_s.state_dict(),"fastflow_kd_LSH_student_model_state_dict.pt")
+        torch.save(model_s,"fastflow_kd_LSH_student_model_first.pt")
         print("model saved...")
         break
       print("Epoch {} /  train loss : {} / val loss : {}".format(i,train_loss,val_loss))
