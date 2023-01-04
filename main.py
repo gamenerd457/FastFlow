@@ -7,7 +7,7 @@ from ignite.contrib import metrics
 
 import constants as const
 import dataset
-from fastflow_org import  fastflow
+import  fastflow_org as  fastflow
 import utils
 
 
