@@ -7,16 +7,8 @@ from ignite.contrib import metrics
 
 import constants as const
 import dataset
-import fastflow
+from fastflow_org import  fastflow
 import utils
-import wandb
-
-wandb.init(project="fastflow-project", entity="kkpp")
-wandb.config = {
-  "learning_rate": const.LR,
-  "epochs": const.NUM_EPOCHS,
-  "batch_size": const.BATCH_SIZE
-}
 
 
 def build_train_data_loader(args, config):
@@ -93,7 +85,6 @@ def train_one_epoch(dataloader, model, optimizer, epoch):
                     epoch + 1, step + 1, loss_meter.val, loss_meter.avg
                 )
             )
-        wandb.log({"loss": loss})
 
 
 def eval_once(dataloader, model):
@@ -139,9 +130,6 @@ def train(args):
                 },
                 os.path.join(checkpoint_dir, "%d.pt" % epoch),
             )
-            art = wandb.Artifact("my-fastflow-models", type="model")
-            art.add_file(os.path.join(checkpoint_dir, "%d.pt" % epoch))
-            wandb.log_artifact(art)
 
 
 def evaluate(args):
