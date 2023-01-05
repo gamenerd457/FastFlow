@@ -9,7 +9,9 @@ import constants as const
 import dataset
 import  fastflow_org as  fastflow
 import utils
-
+from PIL import Image
+import time
+from torchvision import transforms
 
 def build_train_data_loader(args, config):
     train_dataset = dataset.MVTecDataset(
@@ -140,6 +142,43 @@ def evaluate(args):
     test_dataloader = build_test_data_loader(args, config)
     model.cuda()
     eval_once(test_dataloader, model)
+    
+def eval_one_image(args):
+    config = yaml.safe_load(open(args.config, "r"))
+    model = fastflow.FastFlow(
+        backbone_name=config["backbone_name"],
+        flow_steps=config["flow_step"],
+        input_size=config["input_size"],
+        conv3x3_only=config["conv3x3_only"],
+        hidden_ratio=config["hidden_ratio"],)
+    checkpoint = torch.load(args.checkpoint)
+    model.load_state_dict(checkpoint["model_state_dict"])
+    model.eval()
+    auroc_metric = metrics.ROC_AUC()
+    start_time=time.time()
+    image=Image.open("/content/data/bottle/test/broken_large/000.png")
+    target=Image.open("/content/data/bottle/ground_truth/broken_large/000_mask.png")
+    transform=transforms.Compose(
+                [ transforms.Resize(input_size),transforms.ToTensor(),])
+    image=transform(image)
+    target=transform(target)
+    with torch.no_grad():
+        ret = model(image.unsqueeze(0))
+    outputs = ret["anomaly_map"].cpu().detach()
+    outputs = outputs.flatten()
+    targets = targets.flatten()
+    auroc_metric.update((outputs, targets))
+    auroc = auroc_metric.compute()
+    print("AUROC: {}".format(auroc))
+    print("inference completed in --->",time.time()-start_time)
+    
+        
+    
+    
+    
+    
+    
+    
 
 
 def parse_args():
@@ -167,6 +206,6 @@ def parse_args():
 if __name__ == "__main__":
     args = parse_args()
     if args.eval:
-        evaluate(args)
+        eval_one_image(args)
     else:
         train(args)
