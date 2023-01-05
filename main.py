@@ -166,7 +166,7 @@ def eval_one_image(args):
         ret = model(image.unsqueeze(0))
     outputs = ret["anomaly_map"].cpu().detach()
     outputs = outputs.flatten()
-    targets = targets.flatten()
+    targets = target.flatten()
     auroc_metric.update((outputs, targets))
     auroc = auroc_metric.compute()
     print("AUROC: {}".format(auroc))
