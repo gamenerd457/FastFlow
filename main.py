@@ -159,7 +159,7 @@ def eval_one_image(args):
     image=Image.open("/content/data/bottle/test/broken_large/000.png")
     target=Image.open("/content/data/bottle/ground_truth/broken_large/000_mask.png")
     transform=transforms.Compose(
-                [ transforms.Resize(input_size),transforms.ToTensor(),])
+                [ transforms.Resize((256,256)),transforms.ToTensor(),])
     image=transform(image)
     target=transform(target)
     with torch.no_grad():
