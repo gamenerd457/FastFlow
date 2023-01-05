@@ -161,13 +161,13 @@ def eval_one_image(args):
     target=Image.open("/content/data/bottle/ground_truth/broken_large/000_mask.png")
     transform=transforms.Compose(
                 [ transforms.Resize((256,256)),transforms.ToTensor(),])
-    image=transform(image)
-    target=transform(target)
+    image=transform(image).to('cuda')
+    target=transform(target).to('cuda')
     with torch.no_grad():
         ret = model(image.unsqueeze(0))
     outputs = ret["anomaly_map"].cpu().detach()
-    outputs = outputs.flatten()
-    targets = target.flatten()
+    outputs = outputs.flatten().to('cuda')
+    targets = target.flatten().to('cuda')
     auroc_metric.update((outputs, targets))
     auroc = auroc_metric.compute()
     print("AUROC: {}".format(auroc))
