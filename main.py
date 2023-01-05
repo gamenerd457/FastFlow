@@ -154,6 +154,7 @@ def eval_one_image(args):
     checkpoint = torch.load(args.checkpoint)
     model.load_state_dict(checkpoint["model_state_dict"])
     model.eval()
+    model.cuda()
     auroc_metric = metrics.ROC_AUC()
     start_time=time.time()
     image=Image.open("/content/data/bottle/test/broken_large/000.png")
